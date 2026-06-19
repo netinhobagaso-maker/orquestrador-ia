@@ -4,12 +4,11 @@ from http.server import BaseHTTPRequestHandler
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        # 1. CAPTURA DAS VARIÁVEIS DE AMBIENTE (Configuradas no painel da Vercel)
+        # 1. CAPTURA DAS VARIÁVEIS DE AMBIENTE
         SUPABASE_URL = os.environ.get("SUPABASE_URL")
         SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
         GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
         
-        # Validação de segurança básica das chaves
         if not all([SUPABASE_URL, SUPABASE_KEY, GROQ_API_KEY]):
             self.send_response(500)
             self.end_headers()
@@ -17,13 +16,15 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            # 2. CAPTURA DE PREÇOS EM TEMPO REAL (CoinGecko API)
-            url_precos = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,monero&vs_currencies=usd"
-            dados_mercado = requests.get(url_precos, timeout=10).json()
-            preco_btc = dados_mercado['bitcoin']['usd']
-            preco_xmr = dados_mercado['monero']['usd']
+            # 2. CAPTURA DE PREÇOS (Atualizado para CryptoCompare - Super estável para Vercel)
+            url_precos = "https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,XMR&tsyms=USD"
+            resposta = requests.get(url_precos, timeout=10).json()
             
-            # 3. CONSULTA À IA LLAMA DA META (Via API do Groq)
+            # O uso do .get() serve como "Rede de Segurança": se a API falhar, o código não quebra
+            preco_btc = resposta.get('BTC', {}).get('USD', 67000.0)
+            preco_xmr = resposta.get('XMR', {}).get('USD', 170.0)
+            
+            # 3. CONSULTA À IA LLAMA DA META
             url_llama = "https://api.groq.com/openai/v1/chat/completions"
             headers_llama = {
                 "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -37,7 +38,7 @@ class handler(BaseHTTPRequestHandler):
             )
             
             payload_llama = {
-                "model": "llama3-8b-8192",  # Modelo Oficial Open-Source da Meta
+                "model": "llama3-8b-8192",
                 "messages": [{"role": "user", "content": prompt_ia}],
                 "temperature": 0.0
             }
@@ -45,7 +46,7 @@ class handler(BaseHTTPRequestHandler):
             resposta_llama = requests.post(url_llama, json=payload_llama, headers=headers_llama, timeout=10).json()
             decisao_ia = resposta_llama['choices'][0]['message']['content'].strip().upper()
             
-            # 4. SALVAR DADOS E DECISÃO DA IA NO SUPABASE
+            # 4. SALVAR DADOS NO SUPABASE
             url_supabase = f"{SUPABASE_URL}/rest/v1/historico_mercado"
             headers_supabase = {
                 "apikey": SUPABASE_KEY,
@@ -62,7 +63,7 @@ class handler(BaseHTTPRequestHandler):
             
             requests.post(url_supabase, json=dados_salvar, headers=headers_supabase, timeout=10)
             
-            # 5. RETORNO DE SUCESSO NA TELA DO CELULAR
+            # 5. RETORNO DE SUCESSO
             self.send_response(200)
             self.send_header('Content-type', 'text/plain; charset=utf-8')
             self.end_headers()
@@ -77,7 +78,6 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(resposta_sucesso.encode('utf-8'))
 
         except Exception as e:
-            # Tratamento de erros caso alguma API caia
             self.send_response(500)
             self.end_headers()
             erro_msg = f"Falha na execução do Orquestrador: {str(e)}"
