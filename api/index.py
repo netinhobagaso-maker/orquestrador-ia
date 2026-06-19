@@ -23,7 +23,7 @@ class handler(BaseHTTPRequestHandler):
             preco_btc = resposta.get('BTC', {}).get('USD', 67000.0)
             preco_xmr = resposta.get('XMR', {}).get('USD', 170.0)
             
-            # 3. CONSULTA À IA LLAMA DA META (Atualizado para o Llama 3.1)
+            # 3. CONSULTA À IA LLAMA DA META (Corrigido para usar o ponto: 3.1)
             url_llama = "https://api.groq.com/openai/v1/chat/completions"
             headers_llama = {
                 "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -37,7 +37,7 @@ class handler(BaseHTTPRequestHandler):
             )
             
             payload_llama = {
-                "model": "llama-3-1-8b-instant",  # NOVO MODELO ATUALIZADO E ATIVO
+                "model": "llama-3.1-8b-instant",  # NOME CORRIGIDO COM PONTO
                 "messages": [{"role": "user", "content": prompt_ia}],
                 "temperature": 0.0
             }
