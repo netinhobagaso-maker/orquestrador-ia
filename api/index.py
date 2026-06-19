@@ -4,7 +4,7 @@ from http.server import BaseHTTPRequestHandler
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        # 1. CAPTURA DAS VARIÁVEIS DE AMBIENTE
+        # 1. VARIÁVEIS DE AMBIENTE
         SUPABASE_URL = os.environ.get("SUPABASE_URL")
         SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
         GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
@@ -16,11 +16,10 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            # 2. CAPTURA DE PREÇOS (Atualizado para CryptoCompare - Super estável para Vercel)
+            # 2. CAPTURA DE PREÇOS
             url_precos = "https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,XMR&tsyms=USD"
             resposta = requests.get(url_precos, timeout=10).json()
             
-            # O uso do .get() serve como "Rede de Segurança": se a API falhar, o código não quebra
             preco_btc = resposta.get('BTC', {}).get('USD', 67000.0)
             preco_xmr = resposta.get('XMR', {}).get('USD', 170.0)
             
@@ -43,8 +42,15 @@ class handler(BaseHTTPRequestHandler):
                 "temperature": 0.0
             }
             
-            resposta_llama = requests.post(url_llama, json=payload_llama, headers=headers_llama, timeout=10).json()
-            decisao_ia = resposta_llama['choices'][0]['message']['content'].strip().upper()
+            resposta_groq = requests.post(url_llama, json=payload_llama, headers=headers_llama, timeout=10).json()
+            
+            # --- BLINDAGEM CONTRA O ERRO 'CHOICES' ---
+            if 'choices' not in resposta_groq:
+                # Se o Groq rejeitou, capturamos a mensagem real dele
+                mensagem_erro_groq = resposta_groq.get('error', {}).get('message', str(resposta_groq))
+                raise Exception(f"A API do Groq (Llama) rejeitou a chamada. Motivo: {mensagem_erro_groq}")
+            
+            decisao_ia = resposta_groq['choices'][0]['message']['content'].strip().upper()
             
             # 4. SALVAR DADOS NO SUPABASE
             url_supabase = f"{SUPABASE_URL}/rest/v1/historico_mercado"
@@ -79,6 +85,7 @@ class handler(BaseHTTPRequestHandler):
 
         except Exception as e:
             self.send_response(500)
+            self.send_header('Content-type', 'text/plain; charset=utf-8')
             self.end_headers()
             erro_msg = f"Falha na execução do Orquestrador: {str(e)}"
             self.wfile.write(erro_msg.encode('utf-8'))
