@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/orquestrador",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
