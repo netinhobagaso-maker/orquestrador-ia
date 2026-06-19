@@ -16,14 +16,14 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            # 2. CAPTURA DE PREÇOS
+            # 2. CAPTURA DE PREÇOS (CryptoCompare)
             url_precos = "https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,XMR&tsyms=USD"
             resposta = requests.get(url_precos, timeout=10).json()
             
             preco_btc = resposta.get('BTC', {}).get('USD', 67000.0)
             preco_xmr = resposta.get('XMR', {}).get('USD', 170.0)
             
-            # 3. CONSULTA À IA LLAMA DA META
+            # 3. CONSULTA À IA LLAMA DA META (Atualizado para o Llama 3.1)
             url_llama = "https://api.groq.com/openai/v1/chat/completions"
             headers_llama = {
                 "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -37,16 +37,14 @@ class handler(BaseHTTPRequestHandler):
             )
             
             payload_llama = {
-                "model": "llama3-8b-8192",
+                "model": "llama-3-1-8b-instant",  # NOVO MODELO ATUALIZADO E ATIVO
                 "messages": [{"role": "user", "content": prompt_ia}],
                 "temperature": 0.0
             }
             
             resposta_groq = requests.post(url_llama, json=payload_llama, headers=headers_llama, timeout=10).json()
             
-            # --- BLINDAGEM CONTRA O ERRO 'CHOICES' ---
             if 'choices' not in resposta_groq:
-                # Se o Groq rejeitou, capturamos a mensagem real dele
                 mensagem_erro_groq = resposta_groq.get('error', {}).get('message', str(resposta_groq))
                 raise Exception(f"A API do Groq (Llama) rejeitou a chamada. Motivo: {mensagem_erro_groq}")
             
@@ -78,7 +76,7 @@ class handler(BaseHTTPRequestHandler):
                 f"🤖 [SISTEMA NUVEM] Executado com Sucesso!\n"
                 f"📊 Preço BTC: ${preco_btc:,} USD\n"
                 f"📊 Preço XMR: ${preco_xmr:,} USD\n"
-                f"🧠 Comando da IA Llama: {decisao_ia}\n"
+                f"🧠 Comando da IA Llama 3.1: {decisao_ia}\n"
                 f"💾 Histórico registrado no Supabase."
             )
             self.wfile.write(resposta_sucesso.encode('utf-8'))
